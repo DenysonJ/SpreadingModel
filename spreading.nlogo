@@ -13,8 +13,8 @@ people-own
 to setup
   clear-all
   reset-ticks
-  setup-people
   setup_local
+  setup-people
 end
 
 
@@ -89,21 +89,22 @@ to setup-people
     [
       set isWorker false
       set isElderly true
-      set mortality elderly-mortality
+      set mortality comorbidity-mortality
     ]
   ]
 
 end
 
 to setup_local
-
+  let sizexy sqrt(npop / population-density) * 10
+  resize-world 0 sizexy 0 sizexy
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
 555
 10
-992
-448
+1122
+578
 -1
 -1
 13.0
@@ -116,10 +117,10 @@ GRAPHICS-WINDOW
 1
 1
 1
--16
-16
--16
-16
+0
+42
+0
+42
 1
 1
 1
@@ -166,7 +167,7 @@ INPUTBOX
 160
 215
 npop
-500.0
+50000.0
 1
 0
 Number
@@ -174,7 +175,7 @@ Number
 SLIDER
 200
 250
-372
+375
 283
 work-mortality
 work-mortality
@@ -189,7 +190,7 @@ HORIZONTAL
 SLIDER
 200
 320
-372
+375
 353
 young-mortality
 young-mortality
@@ -264,7 +265,7 @@ HORIZONTAL
 SLIDER
 200
 370
-372
+375
 403
 elderly-mortality
 elderly-mortality
@@ -290,6 +291,32 @@ percentage-comorbidity
 1
 %
 HORIZONTAL
+
+SLIDER
+200
+420
+375
+453
+comorbidity-mortality
+comorbidity-mortality
+0
+20
+2.0
+0.01
+1
+%
+HORIZONTAL
+
+INPUTBOX
+200
+155
+347
+215
+population-density
+2800.0
+1
+0
+Number
 
 @#$#@#$#@
 ## WHAT IS IT?

@@ -6,14 +6,14 @@ breed [people person]
 people-own
 [
   isWorker isStudent isTeacher isHealthcare isElderly isComorbidity isNurse ;;here nurse will be used as a professional at a nursing home
-  mortality isInfected isSymptomatic
+  mortality isInfected isSymptomatic willDie daysInfected
   homePosition workPosition
 ]
 
 to setup
   clear-all
   reset-ticks
-  setup_local
+  setup-local
   setup-people
 end
 
@@ -95,19 +95,26 @@ to setup-people
 
 end
 
-to setup_local
+to setup-local
   let sizexy sqrt(npop / population-density) * 10
   resize-world 0 sizexy 0 sizexy
+
+  ask patches
+  [
+   set pcolor white
+   set plabel "F"  ;;patche free
+  ]
+
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
 555
 10
-1122
-578
+1451
+907
 -1
 -1
-13.0
+12.0
 1
 10
 1
@@ -118,9 +125,9 @@ GRAPHICS-WINDOW
 1
 1
 0
-42
+73
 0
-42
+73
 1
 1
 1
@@ -129,9 +136,9 @@ ticks
 
 BUTTON
 25
-105
+40
 89
-138
+73
 Setup
 setup
 NIL
@@ -146,9 +153,9 @@ NIL
 
 BUTTON
 100
-105
+40
 163
-138
+73
 Go
 go
 T
@@ -163,20 +170,20 @@ NIL
 
 INPUTBOX
 25
-155
+90
 160
-215
+150
 npop
-50000.0
+149253.0
 1
 0
 Number
 
 SLIDER
 200
-250
+185
 375
-283
+218
 work-mortality
 work-mortality
 0
@@ -189,9 +196,9 @@ HORIZONTAL
 
 SLIDER
 200
-320
+255
 375
-353
+288
 young-mortality
 young-mortality
 0
@@ -204,9 +211,9 @@ HORIZONTAL
 
 SLIDER
 25
-320
+255
 190
-353
+288
 percentage-young
 percentage-young
 0
@@ -219,9 +226,9 @@ HORIZONTAL
 
 SLIDER
 25
-270
+205
 190
-303
+238
 percentage-teacher
 percentage-teacher
 0
@@ -234,9 +241,9 @@ HORIZONTAL
 
 SLIDER
 25
-225
+160
 190
-258
+193
 percentage-healthcare
 percentage-healthcare
 0
@@ -249,9 +256,9 @@ HORIZONTAL
 
 SLIDER
 25
-370
+305
 190
-403
+338
 percentage-elderly
 percentage-elderly
 0
@@ -264,9 +271,9 @@ HORIZONTAL
 
 SLIDER
 200
-370
+305
 375
-403
+338
 elderly-mortality
 elderly-mortality
 0
@@ -279,9 +286,9 @@ HORIZONTAL
 
 SLIDER
 25
-420
+355
 190
-453
+388
 percentage-comorbidity
 percentage-comorbidity
 0
@@ -294,9 +301,9 @@ HORIZONTAL
 
 SLIDER
 200
-420
+355
 375
-453
+388
 comorbidity-mortality
 comorbidity-mortality
 0
@@ -309,14 +316,44 @@ HORIZONTAL
 
 INPUTBOX
 200
-155
+90
 347
-215
+150
 population-density
 2800.0
 1
 0
 Number
+
+SLIDER
+25
+420
+190
+453
+number-schools
+number-schools
+0
+250
+98.0
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+200
+420
+375
+453
+number-hospitals
+number-hospitals
+0
+30
+18.0
+1
+1
+NIL
+HORIZONTAL
 
 @#$#@#$#@
 ## WHAT IS IT?

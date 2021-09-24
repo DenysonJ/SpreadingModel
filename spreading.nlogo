@@ -1,6 +1,11 @@
 ;; Denyson Jurgen Mendes Grellert
 ;; 00243676
 
+globals
+[
+  number-houses number-workplaces
+]
+
 breed [people person]
 
 people-own
@@ -10,19 +15,31 @@ people-own
   homePosition workPosition
 ]
 
+patches-own
+[
+  capacity
+]
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 to setup
   clear-all
   reset-ticks
   setup-local
   setup-people
+  setup-workplace
 end
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 to go
   tick
 
 end
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 to setup-people
   create-people npop
   [
@@ -34,14 +51,15 @@ to setup-people
     set isComorbidity false
     set isNurse false
 
+    assignHome
+
     set isInfected false
     set isSymptomatic false
     set mortality work-mortality
 
-    set homePosition [0 0]
     set workPosition [0 0]
 
-    set color gray
+    set color green
     set shape "person"
   ]
 
@@ -87,17 +105,28 @@ to setup-people
   [
     if random-float 100 <= percentage-comorbidity
     [
-      set isWorker false
-      set isElderly true
+      set isComorbidity true
+      set mortality comorbidity-mortality
+    ]
+  ]
+
+  ask people with [ isWorker ]
+  [
+    if random-float 100 <= percentage-comorbidity
+    [
+      set isComorbidity true
       set mortality comorbidity-mortality
     ]
   ]
 
 end
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 to setup-local
-  let sizexy sqrt(npop / population-density) * 10
+  let sizexy sqrt(npop / population-density) * 100
   resize-world 0 sizexy 0 sizexy
+  set number-houses round(npop / 2.9)
 
   ask patches
   [
@@ -105,6 +134,99 @@ to setup-local
    set plabel "F"  ;;patche free
   ]
 
+  let n number-schools
+  while [n > 0]
+  [
+    ask one-of patches with [ plabel = "F" ]
+    [
+      set plabel "S"
+      set pcolor blue
+      ask neighbors with [ plabel = "F" ]
+      [
+        set plabel "P"
+        set pcolor brown + 3
+      ]
+    ]
+    set n (n - 1)
+  ]
+
+  let z number-houses
+  while [z > 0]
+  [
+    ask one-of patches with [ plabel = "F" ]
+    [
+      set plabel "H"
+      set pcolor gray
+      set capacity 3
+    ]
+    set z (z - 1)
+  ]
+
+  let i number-hospitals
+  while [i > 0]
+  [
+    ask one-of patches with [ plabel = "F" ]
+    [
+      set plabel "HP"
+      set pcolor yellow - 1
+      set capacity 15
+    ]
+    set i (i - 1)
+  ]
+
+  let j number-nursingHomes
+  while [j > 0]
+  [
+    ask one-of patches with [ plabel = "F" ]
+    [
+      set plabel "N"
+      set pcolor cyan
+    ]
+    set j (j - 1)
+  ]
+
+end
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+to assignHome
+  let myHome one-of patches with [ plabel = "H" and capacity > 0 ]
+  ask myHome [ set capacity (capacity - 1) ]
+
+  set homePosition (list[pxcor] of myHome [pycor] of myHome)
+  setxy first homePosition last homePosition
+end
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+to assignWork [ work ]
+  let myWork one-of patches with [ plabel = work and capacity > 0 ]
+  ask myWork [ set capacity (capacity - 1) ]
+
+  set workPosition (list[pxcor] of myWork [pycor] of myWork)
+end
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+to setup-workplace
+  set number-workplaces (count people with [ isWorker ] / 15)
+
+  let z number-workplaces
+  while [z > 0]
+  [
+    ask one-of patches with [ plabel = "F" ]
+    [
+      set plabel "W"
+      set pcolor magenta
+      set capacity 15
+    ]
+    set z (z - 1)
+  ]
+
+  ask people with [ isWorker ] [ assignWork "W"]
+  ask people with [ isHealthcare ] [ assignWork "H"]
+  ask people with [ isStudent ] [ assignWork "S" ]
+  ask people with [ isTeacher ] [ assignWork "S" ]
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
@@ -174,16 +296,16 @@ INPUTBOX
 160
 150
 npop
-149253.0
+1500.0
 1
 0
 Number
 
 SLIDER
 200
-185
-375
-218
+160
+365
+193
 work-mortality
 work-mortality
 0
@@ -197,7 +319,7 @@ HORIZONTAL
 SLIDER
 200
 255
-375
+365
 288
 young-mortality
 young-mortality
@@ -272,7 +394,7 @@ HORIZONTAL
 SLIDER
 200
 305
-375
+365
 338
 elderly-mortality
 elderly-mortality
@@ -302,7 +424,7 @@ HORIZONTAL
 SLIDER
 200
 355
-375
+365
 388
 comorbidity-mortality
 comorbidity-mortality
@@ -317,7 +439,7 @@ HORIZONTAL
 INPUTBOX
 200
 90
-347
+335
 150
 population-density
 2800.0
@@ -333,8 +455,8 @@ SLIDER
 number-schools
 number-schools
 0
-250
-98.0
+25
+10.0
 1
 1
 NIL
@@ -343,16 +465,46 @@ HORIZONTAL
 SLIDER
 200
 420
-375
+365
 453
 number-hospitals
 number-hospitals
 0
 30
-18.0
+2.0
 1
 1
 NIL
+HORIZONTAL
+
+SLIDER
+25
+465
+190
+498
+number-nursingHomes
+number-nursingHomes
+0
+20
+2.0
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+200
+205
+365
+238
+percentage-nurse
+percentage-nurse
+0
+10
+0.02
+0.01
+1
+%
 HORIZONTAL
 
 @#$#@#$#@

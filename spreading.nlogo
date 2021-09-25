@@ -4,6 +4,7 @@
 globals
 [
   number-houses number-workplaces
+  sizexy ticksday day homeToWork
 ]
 
 breed [people person]
@@ -12,12 +13,12 @@ people-own
 [
   isWorker isStudent isTeacher isHealthcare isElderly isComorbidity isNurse ;;here nurse will be used as a professional at a nursing home
   mortality isInfected isSymptomatic willDie daysInfected
-  homePosition workPosition
+  homePosition workPosition stayHome
 ]
 
 patches-own
 [
-  capacity
+  capacity capacity-total
 ]
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -27,6 +28,9 @@ to setup
   setup-local
   setup-people
   setup-workplace
+  set ticksday round(0.45 * sqrt(2) * sizexy)
+  set homeToWork true
+  set day 0
 end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -34,7 +38,7 @@ end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 to go
   tick
-
+  walk
 end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -51,8 +55,9 @@ to setup-people
     set isComorbidity false
     set isNurse false
 
-    assignHome
+    assignHome "H"
 
+    set stayHome false
     set isInfected false
     set isSymptomatic false
     set mortality work-mortality
@@ -124,15 +129,17 @@ end
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 to setup-local
-  let sizexy sqrt(npop / population-density) * 100
+  set sizexy sqrt(npop / population-density) * 100
   resize-world 0 sizexy 0 sizexy
   set number-houses round(npop / 2.9)
 
+  ;;first set all patches as free patches
   ask patches
   [
    set pcolor white
    set plabel "F"  ;;patche free
   ]
+
 
   let n number-schools
   while [n > 0]
@@ -141,11 +148,7 @@ to setup-local
     [
       set plabel "S"
       set pcolor blue
-      ask neighbors with [ plabel = "F" ]
-      [
-        set plabel "P"
-        set pcolor brown + 3
-      ]
+      ask neighbors with [ plabel = "F" ] [ set pcolor brown + 3 set plabel "P" ]
     ]
     set n (n - 1)
   ]
@@ -170,6 +173,7 @@ to setup-local
       set plabel "HP"
       set pcolor yellow - 1
       set capacity 15
+      ask neighbors with [ plabel = "F" ] [ set pcolor brown + 3 set plabel "P" ]
     ]
     set i (i - 1)
   ]
@@ -189,8 +193,9 @@ end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-to assignHome
-  let myHome one-of patches with [ plabel = "H" and capacity > 0 ]
+to assignHome [ house ]
+  ;;to set an agent to this house, the house should have less agents already assigned than the mean capacity
+  let myHome one-of patches with [ plabel = house and capacity > 0 ]
   ask myHome [ set capacity (capacity - 1) ]
 
   set homePosition (list[pxcor] of myHome [pycor] of myHome)
@@ -200,6 +205,7 @@ end
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 to assignWork [ work ]
+  ;;to set an agent to this workplace, the workplace should have less agents already assigned than the mean capacity
   let myWork one-of patches with [ plabel = work and capacity > 0 ]
   ask myWork [ set capacity (capacity - 1) ]
 
@@ -208,6 +214,7 @@ end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 to setup-workplace
   set number-workplaces (count people with [ isWorker ] / 15)
 
@@ -223,11 +230,78 @@ to setup-workplace
     set z (z - 1)
   ]
 
+  ask patches with [ plabel = "S" ] [ set capacity ceiling((count people with [ isStudent or isTeacher ]) / number-schools) ]
+  ask patches with [ plabel = "N" ] [ set capacity ceiling((count people with [ isElderly or isNurse ]) / number-nursingHomes) ]
+
   ask people with [ isWorker ] [ assignWork "W"]
   ask people with [ isHealthcare ] [ assignWork "H"]
   ask people with [ isStudent ] [ assignWork "S" ]
   ask people with [ isTeacher ] [ assignWork "S" ]
+
+  ask people with [ isElderly ] [ assignHome "N" ]
+  ask people with [ isNurse ] [ assignWork "N" ]
+
+  ask people with [ isHealthcare ] [ assignWork "HP" ]
 end
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+to walk
+  ifelse homeToWork
+  [
+    walk-to-work
+    if floor(ticks / ticksday) > day
+    [
+      set day floor(ticks / ticksday)
+      set homeToWork false
+    ]
+  ]
+  [
+    walk-to-home
+    if floor(ticks / ticksday) > day
+    [
+      set day floor(ticks / ticksday)
+      set homeToWork true
+    ]
+  ]
+end
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+to walk-to-work
+  ask people with [ not stayHome ]
+  [
+    let p patch xcor ycor
+    let w patch first workPosition last workPosition
+    if p != w
+    [
+      let b1 min-one-of neighbors with [ plabel = "F" or plabel = "P" ] [distance w]
+      let b2 min-one-of neighbors [distance w]
+      ifelse b2 = w
+      [ move-to b2 ]
+      [ move-to b2 ]
+    ]
+  ]
+end
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+to walk-to-home
+  ask people
+  [
+    let p patch xcor ycor
+    let h patch first homePosition last homePosition
+    if p != h
+    [
+      let b min-one-of neighbors with [ plabel = "F" or plabel = "P" ] [distance h]
+      let b2 min-one-of neighbors [distance h]
+      ifelse b2 = h
+      [ move-to b2 ]
+      [ move-to b2 ]
+    ]
+  ]
+end
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 @#$#@#$#@
 GRAPHICS-WINDOW
 555
@@ -486,7 +560,7 @@ number-nursingHomes
 number-nursingHomes
 0
 20
-2.0
+3.0
 1
 1
 NIL

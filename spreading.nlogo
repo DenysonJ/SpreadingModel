@@ -50,6 +50,7 @@ to go
   [
 
     walk
+    set countRepetitions countRepetitions + 1
   ]
 end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

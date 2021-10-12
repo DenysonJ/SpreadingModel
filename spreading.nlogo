@@ -7,6 +7,7 @@ globals
   sizexy ticksday day homeToWork
   minInfectionDays maxInfectionDays
   movementsPerTick countRepetitions
+  dailyDeads dailyInfected totalInfected
 ]
 
 breed [people person]
@@ -35,6 +36,7 @@ to setup
   set homeToWork true
   set day 0
   set movementsPerTick 3
+  set totalInfected 0
 
   initialInfection
 end
@@ -51,6 +53,18 @@ to go
 
     walk
     set countRepetitions countRepetitions + 1
+  ]
+end
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+to startDay
+  if floor(ticks / ticksday) > day
+  [
+    set day floor(ticks / ticksday)
+    set dailyDeads 0
+    set dailyInfected 0
   ]
 end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -266,7 +280,6 @@ to walk
     walk-to-work
     if floor(ticks / ticksday) > day
     [
-      set day floor(ticks / ticksday)
       set homeToWork false
     ]
   ]
@@ -274,7 +287,6 @@ to walk
     walk-to-home
     if floor(ticks / ticksday) > day
     [
-      set day floor(ticks / ticksday)
       set homeToWork true
     ]
   ]
@@ -346,6 +358,26 @@ end
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 to evolveInfection
+  ask people with [ isInfected and willDie]
+  [
+    if ticks = finishInfection
+    [
+      set dailyDeads dailyDeads + 1
+      die
+    ]
+  ]
+
+  ask people with [ isInfected]
+  [
+    if ticks = finishInfection
+    [
+      set wasInfected true
+      set isInfected false
+    ]
+  ]
+end
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 
 end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

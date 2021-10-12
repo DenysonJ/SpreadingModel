@@ -5,6 +5,8 @@ globals
 [
   number-houses number-workplaces
   sizexy ticksday day homeToWork
+  minInfectionDays maxInfectionDays
+  movementsPerTick countRepetitions
 ]
 
 breed [people person]
@@ -12,7 +14,7 @@ breed [people person]
 people-own
 [
   isWorker isStudent isTeacher isHealthcare isElderly isComorbidity isNurse ;;here nurse will be used as a professional at a nursing home
-  mortality isInfected isSymptomatic willDie daysInfected
+  mortality isInfected isSymptomatic willDie startInfection finishInfection wasInfected
   homePosition workPosition stayHome
 ]
 
@@ -28,9 +30,13 @@ to setup
   setup-local
   setup-people
   setup-workplace
-  set ticksday round(0.45 * sqrt(2) * sizexy)
+
+  set ticksday round((0.45 / 3) * sqrt(2) * sizexy)
   set homeToWork true
   set day 0
+  set movementsPerTick 3
+
+  initialInfection
 end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -38,7 +44,13 @@ end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 to go
   tick
-  walk
+
+  set countRepetitions 0
+  while [ countRepetitions < movementsPerTick ]
+  [
+
+    walk
+  ]
 end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -60,6 +72,7 @@ to setup-people
     set stayHome false
     set isInfected false
     set isSymptomatic false
+    set wasInfected false
     set mortality work-mortality
 
     set workPosition [0 0]
@@ -271,15 +284,19 @@ end
 to walk-to-work
   ask people with [ not stayHome ]
   [
-    let p patch xcor ycor
-    let w patch first workPosition last workPosition
+    let p patch xcor ycor  ;;actual patch
+    let w patch first workPosition last workPosition  ;;patch of work
+    ;;if is not on work already
     if p != w
     [
+      ;;take the closest patch that is a path (free or path)
       let b1 min-one-of neighbors with [ plabel = "F" or plabel = "P" ] [distance w]
+      ;;take the closest patch
       let b2 min-one-of neighbors [distance w]
+      ;;if the closest patch is the work, then go to there
       ifelse b2 = w
       [ move-to b2 ]
-      [ move-to b2 ]
+      [ move-to b1 ]
     ]
   ]
 end
@@ -289,17 +306,46 @@ end
 to walk-to-home
   ask people
   [
-    let p patch xcor ycor
-    let h patch first homePosition last homePosition
+    let p patch xcor ycor  ;;actual patch
+    let h patch first homePosition last homePosition ;;patch of home
+    ;;if is not on work already
     if p != h
     [
-      let b min-one-of neighbors with [ plabel = "F" or plabel = "P" ] [distance h]
+      ;;take the closest patch that is a path (free or path)
+      let b1 min-one-of neighbors with [ plabel = "F" or plabel = "P" ] [distance h]
+      ;;take the closest patch
       let b2 min-one-of neighbors [distance h]
+      ;;if the closest patch is the home, then go to there
       ifelse b2 = h
       [ move-to b2 ]
-      [ move-to b2 ]
+      [ move-to b1 ]
     ]
   ]
+end
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+to initialInfection
+  set minInfectionDays ticksDay * minInfection
+  set maxInfectionDays ticksDay * maxInfection
+  ;;not start with elderly or people in hospitals
+  ask n-of round(initialInfected * npop / 100) people with [ isStudent = true or isTeacher = true or isWorker = true ]
+  [
+    if random-float 100 < initialInfected
+    [
+      set color red
+      set isInfected true
+      set startInfection 1
+      set finishInfection (minInfectionDays + random(maxInfectionDays - minInfectionDays))
+      if random-float 100 < mortality [ set willDie true ]
+    ]
+  ]
+end
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+to evolveInfection
+
 end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 @#$#@#$#@
@@ -577,6 +623,96 @@ percentage-nurse
 10
 0.02
 0.01
+1
+%
+HORIZONTAL
+
+SLIDER
+25
+525
+197
+558
+minInfection
+minInfection
+0
+25
+10.0
+1
+1
+days
+HORIZONTAL
+
+SLIDER
+25
+565
+197
+598
+maxInfection
+maxInfection
+0
+40
+25.0
+1
+1
+days
+HORIZONTAL
+
+SLIDER
+25
+605
+197
+638
+incubation
+incubation
+0
+15
+7.0
+1
+1
+days
+HORIZONTAL
+
+SLIDER
+200
+525
+365
+558
+initialInfected
+initialInfected
+0
+2
+0.1
+0.01
+1
+%
+HORIZONTAL
+
+SLIDER
+200
+565
+365
+598
+asymptomaticInfectionRatio
+asymptomaticInfectionRatio
+0
+100
+95.0
+0.5
+1
+%
+HORIZONTAL
+
+SLIDER
+200
+605
+365
+638
+asymptomaticFragileInfectionRatio
+asymptomaticFragileInfectionRatio
+0
+100
+20.0
+0.5
 1
 %
 HORIZONTAL

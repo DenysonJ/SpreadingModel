@@ -24,6 +24,12 @@ patches-own
   capacity capacity-total
 ]
 
+;;people colors meaning:
+;;red    = symptomatic infected
+;;violet = asymptomatic infected
+;;green  = susceptible
+;;blue   = recovered
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 to setup
   clear-all
@@ -37,6 +43,8 @@ to setup
   set day 0
   set movementsPerTick 3
   set totalInfected 0
+  set dailyDeads 0
+  set dailyInfected 0
 
   initialInfection
 end
@@ -46,20 +54,23 @@ end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 to go
   tick
+  evolveInfection
+  spreadInfection
 
   set countRepetitions 0
   while [ countRepetitions < movementsPerTick ]
   [
-
     walk
     set countRepetitions countRepetitions + 1
   ]
+
+  finishDay
 end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-to startDay
+to finishDay
   if floor(ticks / ticksday) > day
   [
     set day floor(ticks / ticksday)
@@ -88,6 +99,7 @@ to setup-people
     set isInfected false
     set isSymptomatic false
     set wasInfected false
+    set willDie false
     set mortality work-mortality
 
     set workPosition [0 0]
@@ -258,6 +270,8 @@ to setup-workplace
     set z (z - 1)
   ]
 
+  ask patches with [ plabel = "HP" ] [ set capacity-total 1 ]
+
   ask patches with [ plabel = "S" ] [ set capacity ceiling((count people with [ isStudent or isTeacher ]) / number-schools) ]
   ask patches with [ plabel = "N" ] [ set capacity ceiling((count people with [ isElderly or isNurse ]) / number-nursingHomes) ]
 
@@ -344,21 +358,14 @@ to initialInfection
   ;;not start with elderly or people in hospitals
   ask n-of round(initialInfected * npop / 100) people with [ isStudent = true or isTeacher = true or isWorker = true ]
   [
-    if random-float 100 < initialInfected
-    [
-      set color red
-      set isInfected true
-      set startInfection 1
-      set finishInfection (minInfectionDays + random(maxInfectionDays - minInfectionDays))
-      if random-float 100 < mortality [ set willDie true ]
-    ]
+    infect 1
   ]
 end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 to evolveInfection
-  ask people with [ isInfected and willDie]
+  ask people with [ isInfected and willDie ]
   [
     if ticks = finishInfection
     [
@@ -367,18 +374,57 @@ to evolveInfection
     ]
   ]
 
-  ask people with [ isInfected]
+  ask people with [ isInfected ]
   [
     if ticks = finishInfection
     [
       set wasInfected true
       set isInfected false
+      set isSymptomatic false
+      set color blue
     ]
   ]
 end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+to spreadInfection
+  ask people with [ isInfected ]
+  [
+    ask other people-here with [ (not isInfected) and (not wasInfected) ]
+    [
+      if random-float 100 < probability-of-getting-infection
+      [
+        infect ticks
+      ]
+    ]
+  ]
+end
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+to infect [ start ]
+  set color red
+  set isInfected true
+  set isSymptomatic true
+  set startInfection start + incubation
+  set finishInfection (start + minInfectionDays + random(maxInfectionDays - minInfectionDays))
+  if random-float 100 < mortality [ set willDie true ]
+  ifelse (isComorbidity or isElderly)
+  [
+    if random-float 100 < asymptomaticFragileInfectionRatio
+    [
+      set color violet
+      set isSymptomatic false
+    ]
+  ]
+  [
+    if random-float 100 < asymptomaticInfectionRatio
+    [
+      set color violet
+      set isSymptomatic false
+    ]
+  ]
 end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 @#$#@#$#@
@@ -455,9 +501,9 @@ npop
 Number
 
 SLIDER
-200
+195
 160
-365
+360
 193
 work-mortality
 work-mortality
@@ -470,10 +516,10 @@ work-mortality
 HORIZONTAL
 
 SLIDER
-200
-255
-365
-288
+195
+230
+360
+263
 young-mortality
 young-mortality
 0
@@ -486,9 +532,9 @@ HORIZONTAL
 
 SLIDER
 25
-255
+230
 190
-288
+263
 percentage-young
 percentage-young
 0
@@ -501,9 +547,9 @@ HORIZONTAL
 
 SLIDER
 25
-205
+195
 190
-238
+228
 percentage-teacher
 percentage-teacher
 0
@@ -531,9 +577,9 @@ HORIZONTAL
 
 SLIDER
 25
-305
+265
 190
-338
+298
 percentage-elderly
 percentage-elderly
 0
@@ -545,15 +591,15 @@ percentage-elderly
 HORIZONTAL
 
 SLIDER
-200
-305
-365
-338
+195
+265
+360
+298
 elderly-mortality
 elderly-mortality
 0
 20
-2.0
+2.5
 0.01
 1
 %
@@ -561,9 +607,9 @@ HORIZONTAL
 
 SLIDER
 25
-355
+300
 190
-388
+333
 percentage-comorbidity
 percentage-comorbidity
 0
@@ -575,24 +621,24 @@ percentage-comorbidity
 HORIZONTAL
 
 SLIDER
-200
-355
-365
-388
+195
+300
+360
+333
 comorbidity-mortality
 comorbidity-mortality
 0
 20
-2.0
+2.15
 0.01
 1
 %
 HORIZONTAL
 
 INPUTBOX
-200
+195
 90
-335
+330
 150
 population-density
 2800.0
@@ -602,9 +648,9 @@ Number
 
 SLIDER
 25
-420
+345
 190
-453
+378
 number-schools
 number-schools
 0
@@ -616,10 +662,10 @@ NIL
 HORIZONTAL
 
 SLIDER
-200
-420
-365
-453
+195
+345
+360
+378
 number-hospitals
 number-hospitals
 0
@@ -632,9 +678,9 @@ HORIZONTAL
 
 SLIDER
 25
-465
+380
 190
-498
+413
 number-nursingHomes
 number-nursingHomes
 0
@@ -646,10 +692,10 @@ NIL
 HORIZONTAL
 
 SLIDER
-200
-205
-365
-238
+195
+195
+360
+228
 percentage-nurse
 percentage-nurse
 0
@@ -662,9 +708,9 @@ HORIZONTAL
 
 SLIDER
 25
-525
-197
-558
+425
+190
+458
 minInfection
 minInfection
 0
@@ -677,9 +723,9 @@ HORIZONTAL
 
 SLIDER
 25
-565
-197
-598
+460
+190
+493
 maxInfection
 maxInfection
 0
@@ -692,9 +738,9 @@ HORIZONTAL
 
 SLIDER
 25
-605
-197
-638
+495
+190
+528
 incubation
 incubation
 0
@@ -706,25 +752,25 @@ days
 HORIZONTAL
 
 SLIDER
-200
-525
-365
-558
+195
+425
+360
+458
 initialInfected
 initialInfected
 0
 2
-0.1
+0.2
 0.01
 1
 %
 HORIZONTAL
 
 SLIDER
-200
-565
-365
-598
+195
+460
+360
+493
 asymptomaticInfectionRatio
 asymptomaticInfectionRatio
 0
@@ -736,15 +782,30 @@ asymptomaticInfectionRatio
 HORIZONTAL
 
 SLIDER
-200
-605
-365
-638
+195
+495
+360
+528
 asymptomaticFragileInfectionRatio
 asymptomaticFragileInfectionRatio
 0
 100
 20.0
+0.5
+1
+%
+HORIZONTAL
+
+SLIDER
+195
+380
+360
+413
+probability-of-getting-infection
+probability-of-getting-infection
+0
+25
+3.5
 0.5
 1
 %

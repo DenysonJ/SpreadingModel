@@ -7,7 +7,7 @@ globals
   sizexy ticksday day homeToWork
   minInfectionDays maxInfectionDays
   movementsPerTick countRepetitions
-  dailyDeads dailyInfected totalInfected
+  dailyDeads totalDeads dailyInfected totalInfected
 ]
 
 breed [people person]
@@ -16,7 +16,7 @@ people-own
 [
   isWorker isStudent isTeacher isHealthcare isElderly isComorbidity isNurse ;;here nurse will be used as a professional at a nursing home
   mortality isInfected isSymptomatic willDie startInfection finishInfection wasInfected
-  homePosition workPosition stayHome
+  homePosition workPosition hospitalPosition stayHome inICU
 ]
 
 patches-own
@@ -65,6 +65,10 @@ to go
   ]
 
   finishDay
+  makePlot
+
+  if count people with [ isInfected ] = 0 [ stop ]
+
 end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -100,9 +104,11 @@ to setup-people
     set isSymptomatic false
     set wasInfected false
     set willDie false
+    set inICU false
     set mortality work-mortality
 
     set workPosition [0 0]
+    set hospitalPosition [-1 -1]
 
     set color green
     set shape "person"
@@ -289,6 +295,9 @@ end
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 to walk
+
+  walk-to-hospital
+
   ifelse homeToWork
   [
     walk-to-work
@@ -309,7 +318,7 @@ end
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 to walk-to-work
-  ask people with [ not stayHome ]
+  ask people with [ not stayHome and not inICU ]
   [
     let p patch xcor ycor  ;;actual patch
     let w patch first workPosition last workPosition  ;;patch of work
@@ -331,7 +340,7 @@ end
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 to walk-to-home
-  ask people
+  ask people with [ not inICU ]
   [
     let p patch xcor ycor  ;;actual patch
     let h patch first homePosition last homePosition ;;patch of home
@@ -344,6 +353,28 @@ to walk-to-home
       let b2 min-one-of neighbors [distance h]
       ;;if the closest patch is the home, then go to there
       ifelse b2 = h
+      [ move-to b2 ]
+      [ move-to b1 ]
+    ]
+  ]
+end
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+to walk-to-hospital
+  ask people with [ inICU ]
+  [
+    let p patch xcor ycor  ;;actual patch
+    let w patch first hospitalPosition last hospitalPosition  ;;patch of work
+    ;;if is not on work already
+    if p != w
+    [
+      ;;take the closest patch that is a path (free or path)
+      let b1 min-one-of neighbors with [ plabel = "F" or plabel = "P" ] [distance w]
+      ;;take the closest patch
+      let b2 min-one-of neighbors [distance w]
+      ;;if the closest patch is the work, then go to there
+      ifelse b2 = w
       [ move-to b2 ]
       [ move-to b1 ]
     ]
@@ -370,6 +401,7 @@ to evolveInfection
     if ticks = finishInfection
     [
       set dailyDeads dailyDeads + 1
+      set totalDeads totalDeads + 1
       die
     ]
   ]
@@ -381,7 +413,13 @@ to evolveInfection
       set wasInfected true
       set isInfected false
       set isSymptomatic false
+      set stayHome false
       set color blue
+      if inICU
+      [
+        set inICU false
+        ask patch first hospitalPosition last hospitalPosition [ set capacity-total capacity-total + 1 ]
+      ]
     ]
   ]
 end
@@ -389,8 +427,10 @@ end
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 to spreadInfection
-  ask people with [ isInfected ]
+  ;; people in the incubation period don't spread the infection
+  ask people with [ isInfected and (startInfection < ticks) ]
   [
+    ;; recovered people doesn't get reinfected
     ask other people-here with [ (not isInfected) and (not wasInfected) ]
     [
       if random-float 100 < probability-of-getting-infection
@@ -416,6 +456,7 @@ to infect [ start ]
     [
       set color violet
       set isSymptomatic false
+      set willDie false
     ]
   ]
   [
@@ -423,8 +464,41 @@ to infect [ start ]
     [
       set color violet
       set isSymptomatic false
+      set willDie false
     ]
   ]
+end
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+to symptomaticBehavior
+  let hps patch-set patches with [ plabel = "HP" ]
+  ask people with [ isInfected and isSymptomatic ]
+  [
+    let hp one-of hps with [ capacity-total > 0 ]
+    ask hp [ set capacity-total capacity-total - 1 ]
+
+    ifelse [capacity-total] of hp > 0
+    [
+      set inICU true
+      set hospitalPosition (list[pxcor] of hp [pycor] of hp)
+    ]
+    [
+      set stayHome true
+    ]
+  ]
+end
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+to makePlot
+  set-current-plot "Daily Deads"
+  set-current-plot-pen "dead"
+  plot dailyDeads
+
+  set-current-plot "Cumulative Deads"
+  set-current-plot-pen "dead"
+  plot totalDeads
 end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 @#$#@#$#@
@@ -456,10 +530,10 @@ ticks
 30.0
 
 BUTTON
-25
-40
-89
-73
+15
+10
+79
+43
 Setup
 setup
 NIL
@@ -473,10 +547,10 @@ NIL
 1
 
 BUTTON
-100
-40
-163
-73
+90
+10
+153
+43
 Go
 go
 T
@@ -490,10 +564,10 @@ NIL
 0
 
 INPUTBOX
-25
-90
-160
+15
+60
 150
+120
 npop
 1500.0
 1
@@ -501,10 +575,10 @@ npop
 Number
 
 SLIDER
-195
-160
-360
-193
+185
+130
+350
+163
 work-mortality
 work-mortality
 0
@@ -516,10 +590,10 @@ work-mortality
 HORIZONTAL
 
 SLIDER
-195
-230
-360
-263
+185
+200
+350
+233
 young-mortality
 young-mortality
 0
@@ -531,10 +605,10 @@ young-mortality
 HORIZONTAL
 
 SLIDER
-25
-230
-190
-263
+15
+200
+180
+233
 percentage-young
 percentage-young
 0
@@ -546,10 +620,10 @@ percentage-young
 HORIZONTAL
 
 SLIDER
-25
-195
-190
-228
+15
+165
+180
+198
 percentage-teacher
 percentage-teacher
 0
@@ -561,10 +635,10 @@ percentage-teacher
 HORIZONTAL
 
 SLIDER
-25
-160
-190
-193
+15
+130
+180
+163
 percentage-healthcare
 percentage-healthcare
 0
@@ -576,10 +650,10 @@ percentage-healthcare
 HORIZONTAL
 
 SLIDER
-25
-265
-190
-298
+15
+235
+180
+268
 percentage-elderly
 percentage-elderly
 0
@@ -591,10 +665,10 @@ percentage-elderly
 HORIZONTAL
 
 SLIDER
-195
-265
-360
-298
+185
+235
+350
+268
 elderly-mortality
 elderly-mortality
 0
@@ -606,10 +680,10 @@ elderly-mortality
 HORIZONTAL
 
 SLIDER
-25
-300
-190
-333
+15
+270
+180
+303
 percentage-comorbidity
 percentage-comorbidity
 0
@@ -621,10 +695,10 @@ percentage-comorbidity
 HORIZONTAL
 
 SLIDER
-195
-300
-360
-333
+185
+270
+350
+303
 comorbidity-mortality
 comorbidity-mortality
 0
@@ -636,10 +710,10 @@ comorbidity-mortality
 HORIZONTAL
 
 INPUTBOX
-195
-90
-330
-150
+185
+60
+320
+120
 population-density
 2800.0
 1
@@ -647,10 +721,10 @@ population-density
 Number
 
 SLIDER
-25
-345
-190
-378
+15
+315
+180
+348
 number-schools
 number-schools
 0
@@ -662,10 +736,10 @@ NIL
 HORIZONTAL
 
 SLIDER
-195
-345
-360
-378
+185
+315
+350
+348
 number-hospitals
 number-hospitals
 0
@@ -677,10 +751,10 @@ NIL
 HORIZONTAL
 
 SLIDER
-25
-380
-190
-413
+15
+350
+180
+383
 number-nursingHomes
 number-nursingHomes
 0
@@ -692,10 +766,10 @@ NIL
 HORIZONTAL
 
 SLIDER
-195
-195
-360
-228
+185
+165
+350
+198
 percentage-nurse
 percentage-nurse
 0
@@ -707,10 +781,10 @@ percentage-nurse
 HORIZONTAL
 
 SLIDER
-25
-425
-190
-458
+15
+395
+180
+428
 minInfection
 minInfection
 0
@@ -722,10 +796,10 @@ days
 HORIZONTAL
 
 SLIDER
-25
-460
-190
-493
+15
+430
+180
+463
 maxInfection
 maxInfection
 0
@@ -737,10 +811,10 @@ days
 HORIZONTAL
 
 SLIDER
-25
-495
-190
-528
+15
+465
+180
+498
 incubation
 incubation
 0
@@ -752,25 +826,25 @@ days
 HORIZONTAL
 
 SLIDER
-195
-425
-360
-458
+185
+395
+350
+428
 initialInfected
 initialInfected
 0
 2
-0.2
+0.21
 0.01
 1
 %
 HORIZONTAL
 
 SLIDER
-195
-460
-360
-493
+185
+430
+350
+463
 asymptomaticInfectionRatio
 asymptomaticInfectionRatio
 0
@@ -782,10 +856,10 @@ asymptomaticInfectionRatio
 HORIZONTAL
 
 SLIDER
-195
-495
-360
-528
+185
+465
+350
+498
 asymptomaticFragileInfectionRatio
 asymptomaticFragileInfectionRatio
 0
@@ -797,19 +871,120 @@ asymptomaticFragileInfectionRatio
 HORIZONTAL
 
 SLIDER
-195
-380
-360
-413
+185
+350
+350
+383
 probability-of-getting-infection
 probability-of-getting-infection
 0
 25
-3.5
+5.0
 0.5
 1
 %
 HORIZONTAL
+
+MONITOR
+365
+130
+500
+175
+Symptomatic infected
+count people with [ color = red ]
+2
+1
+11
+
+MONITOR
+365
+180
+500
+225
+Asymptomatic intfected
+count people with [ color = violet ]
+2
+1
+11
+
+MONITOR
+365
+230
+500
+275
+Recovered
+count people with [ color = blue ]
+2
+1
+11
+
+MONITOR
+365
+280
+500
+325
+Susceptible
+count people with [ color = green ]
+2
+1
+11
+
+PLOT
+15
+510
+505
+660
+Infection State
+Time
+People
+0.0
+300.0
+0.0
+1500.0
+true
+true
+"" ""
+PENS
+"Symptomatic" 1.0 0 -2674135 true "" "plot count people with [ color = red ]"
+"Asymptomatic" 1.0 0 -8630108 true "" "plot count people with [ color = violet ]"
+"Recovered" 1.0 0 -13345367 true "" "plot count people with [ color = blue ]"
+"Susceptible" 1.0 0 -10899396 true "" "plot count people with [ color = green ]"
+
+PLOT
+15
+665
+215
+800
+Daily Deads
+Time
+People
+0.0
+30.0
+0.0
+10.0
+true
+false
+"" ""
+PENS
+"dead" 1.0 1 -16777216 true "" ""
+
+PLOT
+220
+665
+420
+800
+Cumulative Deads
+People
+Time
+0.0
+30.0
+0.0
+10.0
+true
+false
+"" ""
+PENS
+"dead" 1.0 0 -16777216 true "" ""
 
 @#$#@#$#@
 ## WHAT IS IT?

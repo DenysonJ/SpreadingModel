@@ -263,6 +263,7 @@ end
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 to setup-workplace
+  ;;all workers will have workplaces
   set number-workplaces (count people with [ isWorker ] / 15)
 
   let z number-workplaces
@@ -345,7 +346,7 @@ to walk-to-home
   [
     let p patch xcor ycor  ;;actual patch
     let h patch first homePosition last homePosition ;;patch of home
-    ;;if is not on work already
+    ;;if is not on home already
     if p != h
     [
       ;;take the closest patch that is a path (free or path)
@@ -363,20 +364,21 @@ end
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 to walk-to-hospital
+  ;;only agents who started to have symptoms go to the hospital
   if count people with [ inICU and (startInfection < ticks) ] > 0
   [
     ask people with [ inICU and (startInfection < ticks) ]
     [
       let p patch xcor ycor  ;;actual patch
-      let w patch first hospitalPosition last hospitalPosition  ;;patch of work
-      ;;if is not on work already
+      let w patch first hospitalPosition last hospitalPosition  ;;patch of hospital
+      ;;if is not on hospital already
       if p != w
       [
         ;;take the closest patch that is a path (free or path)
         let b1 min-one-of neighbors with [ plabel = "F" or plabel = "P" ] [distance w]
         ;;take the closest patch
         let b2 min-one-of neighbors [distance w]
-        ;;if the closest patch is the work, then go to there
+        ;;if the closest patch is the hospital, then go to there
         ifelse b2 = w
         [ move-to b2 ]
         [ move-to b1 ]
@@ -398,8 +400,10 @@ to initialInfection
 end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+;; this function will evolve the infection to recovery or death
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 to evolveInfection
+  ;;at infection time will be determined if the agent will die or not, not here
   if count  people with [ isInfected and willDie ] > 0
   [
     ask people with [ isInfected and willDie ]
@@ -462,7 +466,11 @@ to infect [ start ]
   set isSymptomatic true
   set startInfection start + incubation
   set finishInfection (start + minInfectionDays + random(maxInfectionDays - minInfectionDays))
+
+  ;;determines whether the agent will die or not based on his mortality (of his class)
   if random-float 100 < mortality [ set willDie true ]
+
+  ;;elderly and agents with comorbidity have a higher chance of evolving symptoms
   ifelse (isComorbidity or isElderly)
   [
     if random-float 100 < asymptomaticFragileInfectionRatio

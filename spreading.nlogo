@@ -362,7 +362,7 @@ end
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 to walk-to-hospital
-  ask people with [ inICU ]
+  ask people with [ inICU and (startInfection < ticks) ]
   [
     let p patch xcor ycor  ;;actual patch
     let w patch first hospitalPosition last hospitalPosition  ;;patch of work
@@ -673,7 +673,7 @@ elderly-mortality
 elderly-mortality
 0
 20
-2.5
+10.0
 0.01
 1
 %
@@ -703,7 +703,7 @@ comorbidity-mortality
 comorbidity-mortality
 0
 20
-2.15
+4.0
 0.01
 1
 %

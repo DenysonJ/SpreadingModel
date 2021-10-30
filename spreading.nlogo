@@ -56,6 +56,7 @@ to go
   tick
   evolveInfection
   spreadInfection
+  symptomaticBehavior
 
   set countRepetitions 0
   while [ countRepetitions < movementsPerTick ]
@@ -362,21 +363,24 @@ end
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 to walk-to-hospital
-  ask people with [ inICU and (startInfection < ticks) ]
+  if count people with [ inICU and (startInfection < ticks) ] > 0
   [
-    let p patch xcor ycor  ;;actual patch
-    let w patch first hospitalPosition last hospitalPosition  ;;patch of work
-    ;;if is not on work already
-    if p != w
+    ask people with [ inICU and (startInfection < ticks) ]
     [
-      ;;take the closest patch that is a path (free or path)
-      let b1 min-one-of neighbors with [ plabel = "F" or plabel = "P" ] [distance w]
-      ;;take the closest patch
-      let b2 min-one-of neighbors [distance w]
-      ;;if the closest patch is the work, then go to there
-      ifelse b2 = w
-      [ move-to b2 ]
-      [ move-to b1 ]
+      let p patch xcor ycor  ;;actual patch
+      let w patch first hospitalPosition last hospitalPosition  ;;patch of work
+      ;;if is not on work already
+      if p != w
+      [
+        ;;take the closest patch that is a path (free or path)
+        let b1 min-one-of neighbors with [ plabel = "F" or plabel = "P" ] [distance w]
+        ;;take the closest patch
+        let b2 min-one-of neighbors [distance w]
+        ;;if the closest patch is the work, then go to there
+        ifelse b2 = w
+        [ move-to b2 ]
+        [ move-to b1 ]
+      ]
     ]
   ]
 end
@@ -396,13 +400,16 @@ end
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 to evolveInfection
-  ask people with [ isInfected and willDie ]
+  if count  people with [ isInfected and willDie ] > 0
   [
-    if ticks = finishInfection
+    ask people with [ isInfected and willDie ]
     [
-      set dailyDeads dailyDeads + 1
-      set totalDeads totalDeads + 1
-      die
+      if ticks = finishInfection
+      [
+        set dailyDeads dailyDeads + 1
+        set totalDeads totalDeads + 1
+        die
+      ]
     ]
   ]
 
@@ -428,14 +435,20 @@ end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 to spreadInfection
   ;; people in the incubation period don't spread the infection
-  ask people with [ isInfected and (startInfection < ticks) ]
+  if count people with [isInfected and (startInfection < ticks)] > 0
   [
-    ;; recovered people doesn't get reinfected
-    ask other people-here with [ (not isInfected) and (not wasInfected) ]
+    ask people with [ isInfected and (startInfection < ticks) ]
     [
-      if random-float 100 < probability-of-getting-infection
+      ;; recovered people doesn't get reinfected
+      if count other people-here with [ (not isInfected) and (not wasInfected) ] > 0
       [
-        infect ticks
+        ask other people-here with [ (not isInfected) and (not wasInfected) ]
+        [
+          if random-float 100 < probability-of-getting-infection
+          [
+            infect ticks
+          ]
+        ]
       ]
     ]
   ]
@@ -473,18 +486,22 @@ end
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 to symptomaticBehavior
   let hps patch-set patches with [ plabel = "HP" ]
-  ask people with [ isInfected and isSymptomatic ]
+  if count people with [isInfected and isSymptomatic and (startInfection < ticks)] > 0
   [
-    let hp one-of hps with [ capacity-total > 0 ]
-    ask hp [ set capacity-total capacity-total - 1 ]
+    ask people with [ isInfected and isSymptomatic and (startInfection < ticks) ]
+    [
+      ifelse count hps with [ capacity-total > 0 ] > 0
+      [
+        let hp one-of hps with [ capacity-total > 0 ]
+        ask hp [ set capacity-total capacity-total - 1 ]
 
-    ifelse [capacity-total] of hp > 0
-    [
-      set inICU true
-      set hospitalPosition (list[pxcor] of hp [pycor] of hp)
-    ]
-    [
-      set stayHome true
+        set inICU true
+        set hospitalPosition (list[pxcor] of hp [pycor] of hp)
+
+      ]
+      [
+        set stayHome true
+      ]
     ]
   ]
 end
